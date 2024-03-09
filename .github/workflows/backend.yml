@@ -1,4 +1,4 @@
-name: Laravel App Deployment
+name: Laravel Deployment
 
 on:
   push:
