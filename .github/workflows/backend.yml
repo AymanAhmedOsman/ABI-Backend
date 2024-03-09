@@ -1,6 +1,5 @@
-name: Push-to-EC2
+name: Deploy to EC2
 
-# Trigger deployment only on push to main branch
 on:
   push:
     branches:
@@ -8,31 +7,30 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to EC2 on master branch push
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout the files
+      - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Deploy to Server 1
-        uses: easingthemes/ssh-deploy@main
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
-          REMOTE_HOST: ${{ secrets.HOST_DNS }}
-          REMOTE_USER: ${{ secrets.USERNAME }}
-          TARGET: ${{ secrets.TARGET_DIR }}
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get install -y awscli
 
-      - name: Executing remote ssh commands using ssh key
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST_DNS }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            sudo apt-get -y update
-            sudo apt-get install -y apache2
-            sudo systemctl start apache2
-            sudo systemctl enable apache2
-            cd home
-            sudo mv * /var/www/html
+      - name: Configure AWS credentials
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region your-aws-region
+
+      - name: Setup SSH agent
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Run remote script on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ec2-user@your-ec2-instance-ip 'bash -s' < path/to/your/script.sh
